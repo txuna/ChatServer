@@ -1,0 +1,2 @@
+[2022-1-16 10:53:15] [IN	FO] Booting... System
+[2022-1-16 10:53:15] [WARNNING] Access DataBase
