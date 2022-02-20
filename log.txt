@@ -1,7 +1,0 @@
-[2022-1-16 10:53:15] [IN	FO] Booting... System
-[2022-1-16 10:53:15] [WARNNING] Access DataBase
-[2022-1-16 6:9:30] [INFO] Booting... System
-[2022-1-16 6:9:30] [WARNNING] Access DataBase
-[2022-1-16 6:11:46] [INFO] Booting... System
-[2022-1-16 6:11:46] [WARNNING] Access DataBase
-[2022-1-16 6:11:46] [INFO] Hello START

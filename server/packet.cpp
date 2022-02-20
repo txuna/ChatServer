@@ -30,15 +30,18 @@ void Packet::SetLength(Length_t len){
 }
 
 void Packet::WritePacketBody(Byte_t* buffer){
-
+    std::cout<<"WritePacketBody() in Packet"<<std::endl;
+    return;
 }
 
 void Packet::ParseBuffer(const Byte_t* buffer){
-
+    std::cout<<"ParseBuffer() in Packet"<<std::endl;
+    return;
 }
 
 void Packet::PrintPacket(){
-
+    std::cout<<"PrintPacket() in Packet"<<std::endl;
+    return;
 }
 
 bool Packet::PacketInvalidation(){
@@ -47,7 +50,8 @@ bool Packet::PacketInvalidation(){
 
 
 MsgPacket::MsgPacket(){
-
+    memset(this->name, 0, 8);
+    memset(this->msg, 0, 240);
 }
 
 MsgPacket::~MsgPacket(){
@@ -113,7 +117,8 @@ bool MsgPacket::PacketInvalidation(){
 /* UserPacket */
 
 UserPacket::UserPacket(){
-
+    memset(this->name, 0, 8);
+    memset(this->reserve, 0, 240);
 }
 
 void UserPacket::WritePacketBody(Byte_t* buffer){

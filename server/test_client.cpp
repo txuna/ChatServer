@@ -26,9 +26,10 @@ void func(int sockfd)
 {
     int offset = 0;
     char buffer[256] = {0, };
-    
     read(sockfd, buffer, 256); // 이거 없으면 서버단에서 segmentation fault발생
     // Bad File Descriptor 
+    std::cout<<"[Name]"<<std::endl;
+    std::cout<<buffer+8<<std::endl;
     memset(buffer, 0, 256);
 
     Protocol_t protocol = MSG_PROTOCOL; 
@@ -40,13 +41,15 @@ void func(int sockfd)
     memcpy(buffer+offset, "tuuna", 8);
     offset += 8; 
     memcpy(buffer+offset, "hello world!", 240);  
-    std::cout<<buffer+offset<<std::endl;
+    //std::cout<<buffer+offset<<std::endl;
     write(sockfd, buffer, 256);
     //sleep(5);
     
     memset(buffer, 0, 256); 
     read(sockfd, buffer, 256);
-    //sleep(3);
+    std::cout<<"[Message]"<<std::endl;
+    std::cout<<buffer+16<<std::endl;
+    sleep(3);
 }
    
 int main()

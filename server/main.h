@@ -34,7 +34,7 @@
 #define BUF_SIZE 36
 #define PORT 9988 
 
-#define THREAD_NUM_COUNT 5 
+#define THREAD_NUM_COUNT 5
 
 #define EPOLL_MAX_EVENT 64
 
@@ -178,6 +178,7 @@ class ClientList{
         bool AddClient(std::string name, Socket_t client_fd, struct sockaddr_in info); 
         void DeleteClient(Socket_t client_fd);
         Client* GetFront();
+        int GetClientCount();
         ~ClientList();
 };
 
@@ -269,7 +270,7 @@ class Handler{
         void RegisterNewClient();
         const char* CheckEventType(int type); 
         void StopServer();
-        void ProcessingMsgPacket(Packet* packet); // 클라이언트로 부터 전달받은 메시지를  처리하는 메소드
+        void ProcessingMsgPacket(const Byte_t* buffer); // 클라이언트로 부터 전달받은 메시지를  처리하는 메소드
         bool CheckClientClose(int event);
         void CloseClient(Socket_t fd);
         void SendUserInfoToClient(std::string username, Socket_t fd);

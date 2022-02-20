@@ -44,13 +44,13 @@ void Handler::ManageRequestFromClient(){
     // 왜 ev는포인터를 넘기는가. EPOLLING | EPOLLRDHUD(클라이언트 연결 끊김 감지 )
     // 포인터를 넘겨도 커널단에서 필요한 정보 다 흡수함 나중에 새로 클라이언트에 재활용 가능
     if(epoll_ctl(Epollfd, EPOLL_CTL_ADD, ServSock, &ev) == -1){
-        logging.error(string_format("%s in %s and Line number is %d", "can not observe ServSock using epoll_ctl ", __FILE__, __LINE__ - 1));
+        logging.error(string_format("epoll_ctl() Error : %s", strerror(errno)));
         throw std::runtime_error("epoll_ctl error()");
     }
     ev.events = EPOLLIN | EPOLLET; 
     ev.data.fd = STDIN;
     if(epoll_ctl(Epollfd, EPOLL_CTL_ADD, STDIN, &ev) == -1){
-        logging.error(string_format("Can't Add STDIN in epoll", __FILE__, __LINE__ - 1));
+        logging.error(string_format("epoll_ctl() Error : %s", strerror(errno)));
         throw std::runtime_error("epoll_ctl error()");
     }
     while(true){
@@ -58,7 +58,7 @@ void Handler::ManageRequestFromClient(){
         // 다시 읽는 경우에는 어떻게? 
         int reacted_fd_num = epoll_wait(Epollfd, events, EPOLL_MAX_EVENT, -1); 
         if(reacted_fd_num == -1){
-            logging.error(string_format("%s in %s and Line number is %d", "epoll_wait return -1", __FILE__, __LINE__));
+            logging.error(string_format("epoll_wait() Error : %s", strerror(errno)));
         }
         for(int i=0;i<reacted_fd_num;i++){
             // client의 새로운 요청
@@ -114,7 +114,7 @@ void Handler::RegisterNewClient(){
     std::cout<<string_format("User:%s [IP:%s] Connected", client->GetClientName().c_str(), client->GetIP().c_str())<<std::endl;
     // Client에게 Client  유저의 정보 전송 - 클라이언트는 받은 정보를 기반으로 닉네임 확인 가능
     SendUserInfoToClient(username, client_fd);
-
+    std::cout<<"Have Managed Client Count : "<<client_list->GetClientCount()<<std::endl;
 }
 
 void Handler::SendUserInfoToClient(std::string username, Socket_t fd){
@@ -132,6 +132,8 @@ void Handler::SendUserInfoToClient(std::string username, Socket_t fd){
 }
 
 // epoll_ctl - EPOLL_CTL_DEL 모니터링 제거 -> Client_list에서 제거
+// read and send 큐에서 해당 파일디스크립터 제거? 안해도 될려남 UUMMMMMMMMMMMMMM
+// read queue는 지울필요가 없고 send 큐에? send 할때 해당 큐가 client_list에 있는지 확인
 void Handler::CloseClient(Socket_t fd){
     {
         Client* client = NULL;
@@ -147,6 +149,7 @@ void Handler::CloseClient(Socket_t fd){
         client_list->DeleteClient(fd);
         epoll_ctl(Epollfd, EPOLL_CTL_DEL, fd, NULL);
         close(fd);
+        std::cout<<"Have Managed Client Count : "<<client_list->GetClientCount()<<std::endl;
     }
 }
 
@@ -175,6 +178,7 @@ void Handler::read_client_worker(){
     while(!is_stop_thread){
         std::unique_lock<std::mutex> guard(this->read_client_queue_mutx); 
         while(read_client_queue.empty()){
+            if(is_stop_thread) return;
             this->read_client_condition.wait(guard);
         }
         struct epoll_event event = read_client_queue.front();
@@ -191,36 +195,6 @@ void Handler::read_client_worker(){
     }
 }
 
-/*
-void Handler::read_client_worker(){
-    while(!is_stop_thread){
-        std::unique_lock<std::mutex> guard(this->read_client_queue_mutx); 
-        this->read_client_condition.wait(guard); //wait에서 깨어나면 다시 lock 을 가지는감
-        // Thread 실행 도중 중지 
-        if(is_stop_thread){
-            return;
-        }
-        // 거짓 통보나 큐가 비어져있다면
-        if(read_client_queue.empty()){
-            continue;
-        }
-        struct epoll_event event = read_client_queue.front();
-        read_client_queue.pop(); 
-        //여기서 read를 해버리면 lock된 상태임 IO는 시간이 걸리므로 unlock을 해줘야함
-        guard.unlock(); // lock_guard는 unlock이라는 기능이 없어서 따로 구현해야함 그래서 condition_variable에 사용못함
-        
-        Socket_t client_fd = event.data.fd; 
-        // Close Client Socket - 일부 시스템에서는 EPOLLRDHUP 지원을 안함 -> 그럼 어떻게?
-        if(CheckClientClose(event.events)){
-            CloseClient(client_fd);
-        }else{
-            // rereturn Packet 추후 type 체크하여 알맞은 값으로 캐스팅
-            ReadPacket(client_fd); 
-        }
-         
-    }
-}
-*/
 
 void Handler::ReadPacket(Socket_t fd){
     Byte_t buffer[PACKET_SIZE]; 
@@ -243,27 +217,12 @@ void Handler::ReadPacket(Socket_t fd){
     logging.info(string_format("Read Packet From User:%s [IP:%s]", username.c_str(), ip.c_str()));
     
     memcpy(&protocol, buffer, 4);
-    Packet* packet = NULL;
 
     switch(protocol){
-        case MSG_PROTOCOL:
-            packet = (Packet*)new MsgPacket();
-            packet->ParseBuffer(buffer); //packet이 가리키는 타입에 따라 가상 메소드 호출 
-            // Check Packet Invalidation
-            /*
-            if(packet->PacketInvalidation()){
-                std::unique_lock<std::mutex> guard(this->client_list_mutx);
-                Client* client = client_list->GetClient(fd);
-                if(client != NULL){
-                    logging.warning(string_format("Invalid Packet from Client IP : %s", client->GetIP().c_str()));
-                }else{
-                    logging.warning(string_format("%d client descriptor isn't exist in ClientList", fd));
-                }   
-            }
-            */
-            //packet->PrintPacket();
-            ProcessingMsgPacket(packet);
+        case MSG_PROTOCOL: {
+            ProcessingMsgPacket(buffer);
             break; 
+        }
         
         case REQ_USERLIST_PROTOCOL:
             break; 
@@ -276,7 +235,7 @@ void Handler::ReadPacket(Socket_t fd){
 }
 
 // 클라이언트에게 보낼 패킷 제작 보낸사람 포함
-void Handler::ProcessingMsgPacket(Packet* packet){
+void Handler::ProcessingMsgPacket(const Byte_t* buffer){
     {
         std::unique_lock<std::mutex> guard(this->send_client_queue_mutx);
         {
@@ -286,19 +245,22 @@ void Handler::ProcessingMsgPacket(Packet* packet){
                 if(client == NULL){
                     break; 
                 }
-                struct ClientPacketMap clpkmap = {client->GetClientFd(), packet};
+                MsgPacket* packet = new MsgPacket();
+                packet->ParseBuffer(buffer);
+                struct ClientPacketMap clpkmap = {client->GetClientFd(), (Packet*)packet}; //생각해보니 packet의 주소가 같은 영역임 -> buffer를 여기서 파싱해서 새로운 객체를 매번 만들어야할듯 
                 send_client_queue.push(clpkmap);
                 client = client->GetNext();
             }
         }
     }
-    send_client_condition.notify_all();
+    send_client_condition.notify_one();
 }
 
 void Handler::send_client_worker(){
     while(!is_stop_thread){
         std::unique_lock<std::mutex> guard(this->send_client_queue_mutx); 
         while(send_client_queue.empty()){
+            if(is_stop_thread) return;
             this->send_client_condition.wait(guard);
         }
         struct ClientPacketMap clpkmap = send_client_queue.front(); 
@@ -308,62 +270,34 @@ void Handler::send_client_worker(){
     }
 }
 
-/*
-void Handler::send_client_worker(){
-    while(!is_stop_thread){
-        // 조건 변수의 원자성을 부여하기 위해 뮤텍스를 사용하는건데 조견변수용 뮤텍스를 만들어야 할듯
-        // send_client_queue_mutex가 아닌 send_client_condition_mutex로!!!!!!!!!!! 아닌가 
-        // 스레드 5개가 있고 6개의 데이터가 있다면 5개가 하나씩만 처리하고 1개를 처리하기전에 wait에 빠질듯
-        // https://stackoverflow.com/questions/2379806/using-condition-variable-in-a-producer-consumer-situation
-        std::unique_lock<std::mutex> guard(this->send_client_queue_mutx); 
-        this->send_client_condition.wait(guard, [this]{return !send_client_queue.empty();});
-        if(is_stop_thread){
-            return;
-        }
-        
-        if(send_client_queue.empty()){
-            continue;
-        }
-        
-        struct ClientPacketMap clpkmap = send_client_queue.front(); 
-        send_client_queue.pop();
-        guard.unlock();
-
-        SendPacket(clpkmap.fd, clpkmap.packet);
-    }
-}
-*/
 
 // 전송후 delete packet 
 void Handler::SendPacket(Socket_t fd, Packet* packet){
-    Byte_t buffer[PACKET_SIZE];
+    Byte_t buffer[PACKET_SIZE] = {0, };
     std::cout<<"Server to : "<<fd<<std::endl;
-    std::cout<<"[Packet]"<<std::endl;
-    packet->PrintPacket();
+    packet->PrintPacket(); //패킷이 왜 비어져있지
     packet->WritePacketHeader(buffer);
     packet->WritePacketBody(buffer); 
-    std::string username;
-    std::string ip; 
+    Client* client = NULL;
     {
         std::unique_lock<std::mutex> guard(this->client_list_mutx);
-        Client* client = client_list->GetClient(fd);
-        username = client->GetClientName(); 
-        ip = client->GetIP();
+        client = client_list->GetClient(fd);
+    }
+    if(client == NULL){
+        return; // 이미 종료된 소켓 
     }
     //Error Check -  // 전송된 데이터량 반환 및 에러체크
     int byte = send(fd, buffer, PACKET_SIZE, 0);
     if(byte == -1){
-        logging.warning(string_format("Can't send Packet To User:%s [IP:%s] : %s", username.c_str(), ip.c_str(), strerror(errno))); 
+        logging.warning(string_format("Can't send Packet To User:%s [IP:%s] : %s", client->GetClientName().c_str(), client->GetIP().c_str(), strerror(errno))); 
         CloseClient(fd);
         return;
     }
-    logging.info(string_format("Send Packet To User:%s [IP:%s]", username.c_str(), ip.c_str()));
+    logging.info(string_format("Send Packet To User:%s [IP:%s]", client->GetClientName().c_str(), client->GetIP().c_str()));
 
-    /*
-    std::cout<<"BEFORE"<<std::endl;
+    // 어떤스레드는 해제하고 어떤스레드는 접근하나?  YES -> ProcessingMsg 함수에서 동일한 힙주소를 가진 packet를 send_client_queue에 넣어서 매번 해제(같은 거를)해서 double free bug 발생한거임
     delete packet;
-    std::cout<<"AFTER"<<std::endl;
-    */
+
 }
 
 const char* Handler::CheckEventType(int type){

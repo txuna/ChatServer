@@ -6,6 +6,8 @@ Client::Client(std::string name, Socket_t client_fd, struct sockaddr_in info){
     this->info = info;
 }
 
+
+
 int Client::GetClientFd(){
     return this->client_fd;
 }
@@ -40,6 +42,16 @@ ClientList::ClientList() :
     head(NULL)
 {
 
+}
+
+int ClientList::GetClientCount(){
+    int count=0;
+    Client* curr = this->GetFront(); 
+    while(curr != NULL){
+        count += 1; 
+        curr = curr->GetNext();
+    }
+    return count;
 }
 
 Client* ClientList::GetFront(){
