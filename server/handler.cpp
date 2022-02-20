@@ -253,7 +253,7 @@ void Handler::ProcessingMsgPacket(const Byte_t* buffer){
             }
         }
     }
-    send_client_condition.notify_one();
+    send_client_condition.notify_one(); //test
 }
 
 void Handler::send_client_worker(){
