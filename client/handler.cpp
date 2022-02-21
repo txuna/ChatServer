@@ -3,6 +3,9 @@
 
 // 패킷 조립 후 전송
 bool Handler::SendRawPacketToServer(QString& msg){
+    if(Socket->state() != QAbstractSocket::ConnectedState){
+        return false;
+    }
     MsgPacket* packet = new MsgPacket();
     packet->SetProtocol(MSG_PROTOCOL);
     packet->SetLength(PACKET_SIZE);
@@ -12,17 +15,18 @@ bool Handler::SendRawPacketToServer(QString& msg){
     Byte_t buffer[PACKET_SIZE];
     packet->WritePacketHeader(buffer);
     packet->WritePacketBody(buffer);
-    Socket->writeData(buffer, PACKET_SIZE);
+    Socket->write(buffer, PACKET_SIZE);
 
     delete packet;
+    return true;
 }
 
 // stream byte를 Packet으로 만들어서 return 한다.
 Packet* Handler::ReceiveRawPacket(){
     Byte_t buffer[PACKET_SIZE];
     Protocol_t protocol;
-    Packet* packet;
-    int byte = Socket->readData(buffer, PACKET_SIZE);
+    Packet* packet = NULL;
+    int byte = Socket->read(buffer, PACKET_SIZE);
     if(byte == -1){
         return NULL; //ERROR
     }
@@ -60,14 +64,6 @@ QTcpSocket* Handler::GetSocket(){
     return this->Socket;
 }
 
-// packet을 가공해서 해당 메시지 처리
-QString Handler::ProcessingResponseMsg(Packet* packet){
-    QString msg = "[" + "Time" + "] ";
-    msg += packet->GetMsg();
-    return msg;
-}
-
-
 // RequestUserList에서 서버쪽으로 패킷을 보내고 Chat::ReceivePacket 메소드에서 Handler의 패킷처리를하고 해당 함수 호출
 UserList* Handler::ProcessingResponseUserList(Packet* packet){
     UserList* userlist = new UserList;
@@ -75,12 +71,14 @@ UserList* Handler::ProcessingResponseUserList(Packet* packet){
     userlist->AppendUser("kissesy");
     userlist->AppendUser("sloan");
     return userlist;
-
 }
 
 void Handler::SetUserName(UserPacket* packet){
     this->username = packet->GetName();
-    //this->username = packet->GetName();
+}
+
+std::string Handler::GetName(){
+    return this->username;
 }
 
 Handler::~Handler(){

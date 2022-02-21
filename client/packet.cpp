@@ -83,11 +83,11 @@ void MsgPacket::SetMsg(std::string msg){
 }
 
 QString MsgPacket::GetMsg(){
-
+    return QString(msg);
 }
 
 QString MsgPacket::GetName(){
-
+    return QString(name);
 }
 
 
@@ -124,7 +124,7 @@ void UserPacket::SetName(std::string name){
 }
 
 std::string UserPacket::GetName(){
-
+    return std::string(name);
 }
 
 UserPacket::~UserPacket(){

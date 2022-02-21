@@ -143,6 +143,7 @@ public:
     QTcpSocket* GetSocket();
     void SetUserName(UserPacket* packet);
     virtual ~Handler();
+    std::string GetName();
 };
 
 
@@ -171,7 +172,7 @@ public:
     QHBoxLayout* get_base();
     void ConnectToServer();
     void UpdateUserList(Packet* packet); // UI Update
-    void UpdateMsg(Packet* packet);
+    void UpdateMsg(MsgPacket* packet);
     void Setup();
     void DeleteUserListWidgetItem();
     void DeleteMsgListWidgetItem();

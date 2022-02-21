@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 
 Chat::Chat(){
-    handler = new Handler("158.247.217.153", 9988);
+    handler = new Handler("127.0.0.1", 9988);
     BaseHbox = new QHBoxLayout;
     ChatVBox = new QVBoxLayout;
     InputHBox = new QHBoxLayout;
@@ -100,6 +100,7 @@ void Chat::onReceivePacket(){
 
         case RES_USERINFO_PROTOCOL:
             handler->SetUserName((UserPacket*)packet);
+            PrintMsg("Hello " + QString::fromStdString(handler->GetName()));
             break;
     }
 }
@@ -113,7 +114,7 @@ QHBoxLayout* Chat::get_base(){
 void Chat::UpdateMsg(MsgPacket *packet){
     QListWidgetItem* item = new QListWidgetItem;
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
-    QString msg = "[" + "Time" + "] " + "[" + packet->GetName() + "] ";
+    QString msg = "[" + QDateTime::currentDateTime().toString() + "] " + "[" + packet->GetName() + "] ";
     msg += packet->GetMsg();
     item->setText(msg);
     MsgListWidget->addItem(item);
@@ -123,7 +124,7 @@ void Chat::PrintMsg(const QString& msg){
     QListWidgetItem* item = new QListWidgetItem;
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
     QDateTime now = QDateTime::currentDateTime();
-    QString temp = "[" + now.toString() + "] " + msg;
+    QString temp = "[" + now.toString() + "] " +"[System] " + msg;
     item->setText(temp);
     MsgListWidget->addItem(item);
 }
