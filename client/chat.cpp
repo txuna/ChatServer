@@ -52,13 +52,17 @@ void Chat::Setup(){
     connect(SendLine, SIGNAL(returnPressed()), this, SLOT(onSendMsg()));
 }
 
+// 서버와 접속이 끊어졌습니다. 메시지 박스 - socket close?
 void Chat::onError(){
-    qDebug()<<"[DEBUG]"<<handler->GetSocket()->errorString();
+    QMessageBox msgBox;
+    msgBox.setText(handler->GetSocket()->errorString());
+    msgBox.exec();
+    exit(0);
 }
 
 // 서버와의 접속이 완료되면 호출 - 비동기 콜백
 void Chat::onConnectedFromServer(){
-    handler->RequestUserList();
+    PrintMsg("Successfully Connected From Server! Have good day :)");
 }
 
 // 서버와의 접속이 끊어지면 호출 - 비동기 콜백
@@ -75,34 +79,29 @@ void Chat::ConnectToServer(){
 }
 
 void Chat::onSendMsg(){
-
-    QString msg = this->SendLine->text();;
+    QString msg = this->SendLine->text();
     //패킷 전송 부분
     handler->SendRawPacketToServer(msg); //private
     this->SendLine->setText("");
-    TestPrintMsg(msg);
 }
 
 //비동기  콜백 - 서버에서 메시지가 오면 호출
 void Chat::onReceivePacket(){
     qDebug()<<"[DEBUG]"<<"Received Packet From Server!";
     // ByteArray -> Assemble To Packet Object;
-    Packet* packet = handler->ProcessingRawPacket();
+    Packet* packet = handler->ReceiveRawPacket();
+    if(packet == NULL){
+        onError();
+    }
+    switch (packet->GetProtocol()) {
+        case MSG_PROTOCOL:
+            UpdateMsg((MsgPacket*)packet);
+            break;
 
-    //처리된 패킷의 type에따라 기능 결정
-    switch(packet->GetType()){
-        case UPDATE_MSG:
-            return;
-
-        case UPDATE_USER:
-            return;
-
-        // 소켓의 에러가아닌 서버에 대한 잘못된 접근에 대한 에러
-        case ERROR:
-            return;
-
-        default:
-            return;
+        case RES_USERINFO_PROTOCOL:
+            handler->SetUserName((UserPacket*)packet);
+            PrintMsg("Hello " + QString::fromStdString(handler->GetName()));
+            break;
     }
 }
 
@@ -112,21 +111,20 @@ QHBoxLayout* Chat::get_base(){
 
 
 // 패킷의 msg부분을 업데이트 + 날짜도 추가하기
-void Chat::UpdateMsg(Packet *packet){
+void Chat::UpdateMsg(MsgPacket *packet){
     QListWidgetItem* item = new QListWidgetItem;
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
-    QString msg = handler->ProcessingResponseMsg(packet);
+    QString msg = "[" + QDateTime::currentDateTime().toString() + "] " + "[" + packet->GetName() + "] ";
+    msg += packet->GetMsg();
     item->setText(msg);
-    //QString temp = "[" + packet->GetTimeStamp() + "] ";
-    //item->setText(msg + QString::fromStdString(packet->GetMsg()));
     MsgListWidget->addItem(item);
 }
 
-void Chat::TestPrintMsg(const QString& msg){
+void Chat::PrintMsg(const QString& msg){
     QListWidgetItem* item = new QListWidgetItem;
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
     QDateTime now = QDateTime::currentDateTime();
-    QString temp = "[" + now.toString() + "] " + msg;
+    QString temp = "[" + now.toString() + "] " +"[System] " + msg;
     item->setText(temp);
     MsgListWidget->addItem(item);
 }

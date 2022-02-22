@@ -21,9 +21,19 @@
 #include <QHostAddress>
 #include <QDebug>
 #include <QDateTime>
-#define UPDATE_MSG 1
-#define UPDATE_USER 2
-#define ERROR 3
+#include <cstring>
+#include <string>
+
+#define MSG_PROTOCOL 1
+#define REQ_USERLIST_PROTOCOL 2
+#define RES_USERLIST_PROTOCOL 3
+#define RES_USERINFO_PROTOCOL 4
+
+#define PACKET_SIZE 256
+
+typedef char Byte_t;
+typedef uint32_t Protocol_t;
+typedef uint32_t Length_t;
 
 namespace Ui {
 class MainWindow;
@@ -41,24 +51,53 @@ private:
     Ui::MainWindow *ui;
 };
 
-// 패킷을 상속해서 여러버전으로 만들까
 class Packet{
-private:
-    unsigned int size;
-    //std::string roomkey; //roomkey
-    unsigned int type;  // 0 : send msg size, 1 : get user , 2 : send message , 4 : Error
-    QString msg;
-    QDateTime timestamp;
+    protected:
+        Protocol_t protocol;
+        Length_t len; // protocol size + len size를 뺀 body의 사이즈
 
-public:
-    Packet(unsigned int size,
-           unsigned int type,
-           QString msg);
-    QString GetMsg();
-    unsigned int GetType();
-    unsigned int GetSize();
-    QString GetTimeStamp();
-    ~Packet();
+    public:
+        Packet();
+        virtual ~Packet();
+        Protocol_t GetProtocol();
+        Length_t GetLength();
+        void SetProtocol(Protocol_t protocol);
+        void SetLength(Length_t len);
+        void WritePacketHeader(Byte_t* buffer);
+        virtual void WritePacketBody(Byte_t* buffer);
+        virtual void ParseBuffer(const Byte_t* buffer); //buffer를 packet화
+};
+
+/*
+통신을  통해 받은 buffer를 packet화 하기위해서는 ParseBuffer 메소드를 이용하고
+통신패킷으로 보낼 buffer는 WritePacketheader와 WritePacketBody를 통해서 전송
+*/
+class MsgPacket : public Packet{
+    private:
+        Byte_t name[8];
+        Byte_t msg[240];
+    public:
+        MsgPacket();
+        virtual ~MsgPacket();
+        virtual void WritePacketBody(Byte_t* buffer); // packet -> buffer
+        virtual void ParseBuffer(const Byte_t* buffer); //buffer -> packet
+        void SetName(std::string name);
+        void SetMsg(std::string msg);
+        QString GetName();
+        QString GetMsg();
+};
+
+class UserPacket : public Packet{
+    private:
+        Byte_t name[8];
+        Byte_t reserve[240];
+    public:
+        UserPacket();
+        virtual ~UserPacket();
+        virtual void WritePacketBody(Byte_t* buffer);
+        virtual void ParseBuffer(const Byte_t* buffer);
+        void SetName(std::string name);
+        std::string GetName();
 };
 
 class User{
@@ -89,7 +128,7 @@ public:
 class Handler{
 private:
     QTcpSocket* Socket;
-    std::string userid; //유저를 증명하는 키값 64자리 해쉬값 난수를통해 불러옴
+    std::string username; //유저를 증명하는 키값 64자리 해쉬값 난수를통해 불러옴
     QHostAddress host;
     quint16 port;
 
@@ -100,9 +139,11 @@ public:
     UserList* ProcessingResponseUserList(Packet* packet);
     QString ProcessingResponseMsg(Packet* packet);
     void RequestUserList();
-    Packet* ProcessingRawPacket(); // Raw패킷을 Packet클래스로 전환
+    Packet* ReceiveRawPacket(); // Raw패킷을 Packet클래스로 전환
     QTcpSocket* GetSocket();
+    void SetUserName(UserPacket* packet);
     virtual ~Handler();
+    std::string GetName();
 };
 
 
@@ -131,11 +172,11 @@ public:
     QHBoxLayout* get_base();
     void ConnectToServer();
     void UpdateUserList(Packet* packet); // UI Update
-    void UpdateMsg(Packet* packet);
+    void UpdateMsg(MsgPacket* packet);
     void Setup();
     void DeleteUserListWidgetItem();
     void DeleteMsgListWidgetItem();
-    void TestPrintMsg(const QString& msg);
+    void PrintMsg(const QString& msg);
     virtual ~Chat();
 
 private slots:
