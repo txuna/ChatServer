@@ -151,7 +151,6 @@ class Client{
     private:
         Socket_t client_fd; 
         std::string name; // Client 접속시 임의로 지정  
-        std::string name_hash; 
         Client* next;
         struct sockaddr_in info; 
     public:
@@ -233,6 +232,23 @@ class UserPacket : public Packet{
         void SetName(std::string name);
 };
 
+class UserListPacket : publiuc Packet{
+    private:
+        uint32_t num; // num of user
+        Byte_t name_list[232] // max 29 * 8 + NULL(*)
+        Byte_t reserve[4];
+
+    public:
+        UserListPacket(); 
+        virtual ~UserListPacket(); 
+        virtual void WritePacketBody(Byte_t* buffer); 
+        virtual void ParseBuffer(const Byte_t* buffer); 
+        virtual void PrintPacket(); 
+        void SetNum(int num); 
+        void AddUserName(int index, std::string username);
+        UserListPacket& operator=(UserListPacket&  obj);
+}
+
 // 패킷 send시 fd - packet 쌍 
 struct ClientPacketMap{
     Socket_t fd; 
@@ -274,6 +290,7 @@ class Handler{
         bool CheckClientClose(int event);
         void CloseClient(Socket_t fd);
         void SendUserInfoToClient(std::string username, Socket_t fd);
+        void SendUserListToConnectedClient();
     public:
         void StopThread(); 
         Handler(); 

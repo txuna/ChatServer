@@ -131,6 +131,37 @@ void Handler::SendUserInfoToClient(std::string username, Socket_t fd){
     send_client_condition.notify_one();
 }
 
+// 접속된 클라이언트에게 특정 이벤트를 기준으로 접속된 클라이언트의 정보 전송
+void Handler::SendUserListToConnectedClient(){
+    std::unique_lock<std::mutex> guard(this->client_list_mutx);
+    UserListPacket* user_list_packet = new UserListPacket();
+    Client* client = client_list->GetFront();
+    user_list_packet->SetNum(client_list->GetClientCount());
+    int index=0;
+    // 패킷 내용 채우기 
+    while(client != NULL){
+        std::string username = client->GetClientName(); 
+        user_list_packet->AddUserName(index, username);
+        client = client->GetNext();
+        index+=1;
+    }
+
+    // 클라이언트에게 내용 전송  해당 Heap 패킷을 클라이언트 갯수마다 DEEP COPY를 해야함
+    client = client_list->GetFront();
+    std::unique_lock<std::mutex> guard(this->send_client_queue_mutx); 
+    while(client != NULL){
+        UserListPacket* packet = new UserListPacket();
+        // packet = user_list_packet; //DEEP COPY - 연산자 오버로딩?
+        Socket_t fd = client->GetClientFd();
+        struct ClientPacketMap clpkmap = {fd, (Packet*)packet}; 
+        send_client_queue.push(clpkmap);
+        client = client->GetNext();
+        
+    }
+    send_client_condition.notify_all();
+    delete user_list_packet;
+}
+
 // epoll_ctl - EPOLL_CTL_DEL 모니터링 제거 -> Client_list에서 제거
 // read and send 큐에서 해당 파일디스크립터 제거? 안해도 될려남 UUMMMMMMMMMMMMMM
 // read queue는 지울필요가 없고 send 큐에? send 할때 해당 큐가 client_list에 있는지 확인
