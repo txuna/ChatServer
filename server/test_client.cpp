@@ -26,10 +26,23 @@ void func(int sockfd)
 {
     int offset = 0;
     char buffer[256] = {0, };
-    read(sockfd, buffer, 256); // 이거 없으면 서버단에서 segmentation fault발생
+    read(sockfd, buffer, 256); // 이거 없으면 서버단에서 segmentation fault발생 // GetUserInfo
     // Bad File Descriptor 
     std::cout<<"[Name]"<<std::endl;
     std::cout<<buffer+8<<std::endl;
+    memset(buffer, 0, 256);
+
+    //Get User List
+    read(sockfd, buffer, 256); 
+    uint32_t num=0; 
+    memcpy(&num, buffer+8, 4);
+    std::cout<<"User Num : "<<num<<std::endl;
+    /*for(int i=0;i<num;i++){
+        char name[8] = {0, };
+        memcpy(name, buffer+12+(8*i), 8); 
+        name[7] = 0x0;
+        std::cout<<"User Name : "<<name<<std::endl;
+    }
     memset(buffer, 0, 256);
 
     Protocol_t protocol = MSG_PROTOCOL; 

@@ -63,6 +63,9 @@ void Handler::ManageRequestFromClient(){
         for(int i=0;i<reacted_fd_num;i++){
             // client의 새로운 요청
             if(events[i].data.fd == ServSock){
+                if(CheckMaxClient()){
+                    continue;
+                }
                 RegisterNewClient();
             }else if(events[i].data.fd == 1){
                 char temp[256]; 
@@ -84,6 +87,21 @@ void Handler::StopServer(){
     logging.info("Stop Server...");
     this->~Handler();
     exit(0);
+}
+
+// 지금은 클라리언트의 접속을 막지만 나중에는 클라이언트가 대기할 수 있도록 스레드 구비
+bool Handler::CheckMaxClient(){
+    {
+        int num = 0;
+        std::unique_lock<std::mutex> guard(this->client_list_mutx); 
+        num = client_list->GetClientCount();
+        if(num >= MAX_CLIENT){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    return true;
 }
 
 /*
@@ -114,6 +132,7 @@ void Handler::RegisterNewClient(){
     std::cout<<string_format("User:%s [IP:%s] Connected", client->GetClientName().c_str(), client->GetIP().c_str())<<std::endl;
     // Client에게 Client  유저의 정보 전송 - 클라이언트는 받은 정보를 기반으로 닉네임 확인 가능
     SendUserInfoToClient(username, client_fd);
+    SendUserListToConnectedClient();
     std::cout<<"Have Managed Client Count : "<<client_list->GetClientCount()<<std::endl;
 }
 
@@ -133,10 +152,14 @@ void Handler::SendUserInfoToClient(std::string username, Socket_t fd){
 
 // 접속된 클라이언트에게 특정 이벤트를 기준으로 접속된 클라이언트의 정보 전송
 void Handler::SendUserListToConnectedClient(){
-    std::unique_lock<std::mutex> guard(this->client_list_mutx);
+    std::unique_lock<std::mutex> client_list_guard(this->client_list_mutx);
+
     UserListPacket* user_list_packet = new UserListPacket();
+    user_list_packet->SetProtocol(RES_USERLIST_PROTOCOL);
+    user_list_packet->SetLength(PACKET_SIZE);
     Client* client = client_list->GetFront();
     user_list_packet->SetNum(client_list->GetClientCount());
+    Byte_t* buffer = new Byte_t[PACKET_SIZE];
     int index=0;
     // 패킷 내용 채우기 
     while(client != NULL){
@@ -145,20 +168,27 @@ void Handler::SendUserListToConnectedClient(){
         client = client->GetNext();
         index+=1;
     }
+    client_list_guard.unlock();
+    //좋지 못한 과정이지만 통일성을 위해서 buffer화 시킨다음에 다시 패킷화
+    user_list_packet->WritePacketHeader(buffer);
+    user_list_packet->WritePacketBody(buffer);
 
     // 클라이언트에게 내용 전송  해당 Heap 패킷을 클라이언트 갯수마다 DEEP COPY를 해야함
     client = client_list->GetFront();
-    std::unique_lock<std::mutex> guard(this->send_client_queue_mutx); 
+    std::unique_lock<std::mutex> client_queue_guard(this->send_client_queue_mutx); 
+    // 관리되고 있는 클라이언트만큼 전송
+    client_list_guard.lock();
+    //std::unique_lock<std::mutex> guard(this->client_list_mutx);
     while(client != NULL){
         UserListPacket* packet = new UserListPacket();
-        // packet = user_list_packet; //DEEP COPY - 연산자 오버로딩?
+        packet->ParseBuffer(buffer);
         Socket_t fd = client->GetClientFd();
         struct ClientPacketMap clpkmap = {fd, (Packet*)packet}; 
         send_client_queue.push(clpkmap);
         client = client->GetNext();
-        
     }
     send_client_condition.notify_all();
+    delete[] buffer;
     delete user_list_packet;
 }
 
@@ -181,6 +211,7 @@ void Handler::CloseClient(Socket_t fd){
         epoll_ctl(Epollfd, EPOLL_CTL_DEL, fd, NULL);
         close(fd);
         std::cout<<"Have Managed Client Count : "<<client_list->GetClientCount()<<std::endl;
+        //SendUserListToConnectedClient();
     }
 }
 
@@ -268,9 +299,9 @@ void Handler::ReadPacket(Socket_t fd){
 // 클라이언트에게 보낼 패킷 제작 보낸사람 포함
 void Handler::ProcessingMsgPacket(const Byte_t* buffer){
     {
-        std::unique_lock<std::mutex> guard(this->send_client_queue_mutx);
+        std::unique_lock<std::mutex> client_queue_guard(this->send_client_queue_mutx);
         {
-            std::unique_lock<std::mutex> guard(this->client_list_mutx); 
+            std::unique_lock<std::mutex> client_list_guard(this->client_list_mutx); 
             Client* client = client_list->GetFront(); 
             while(true){
                 if(client == NULL){

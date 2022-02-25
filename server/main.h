@@ -23,7 +23,6 @@
 #include <signal.h>
 #include <atomic>
 
-
 #ifndef SERVER_H
 #define SERVER_H
 
@@ -36,7 +35,7 @@
 
 #define THREAD_NUM_COUNT 5
 
-#define EPOLL_MAX_EVENT 64
+#define EPOLL_MAX_EVENT 25
 
 #define MAX_MSG_SIZE 240
 #define PACKET_SIZE 256
@@ -48,6 +47,8 @@
 #define RES_USERINFO_PROTOCOL 4
 
 #define STDIN 1 
+
+#define MAX_CLIENT 25
 
 typedef char Byte_t;
 typedef int Socket_t; 
@@ -232,11 +233,11 @@ class UserPacket : public Packet{
         void SetName(std::string name);
 };
 
-class UserListPacket : publiuc Packet{
+class UserListPacket : public Packet{
     private:
         uint32_t num; // num of user
-        Byte_t name_list[232] // max 29 * 8 + NULL(*)
-        Byte_t reserve[4];
+        Byte_t name_list[232]; // max 29 * 8 + NULL(*)
+        Byte_t reserve[12];
 
     public:
         UserListPacket(); 
@@ -244,10 +245,9 @@ class UserListPacket : publiuc Packet{
         virtual void WritePacketBody(Byte_t* buffer); 
         virtual void ParseBuffer(const Byte_t* buffer); 
         virtual void PrintPacket(); 
-        void SetNum(int num); 
+        void SetNum(uint32_t num); 
         void AddUserName(int index, std::string username);
-        UserListPacket& operator=(UserListPacket&  obj);
-}
+};
 
 // 패킷 send시 fd - packet 쌍 
 struct ClientPacketMap{
@@ -291,6 +291,7 @@ class Handler{
         void CloseClient(Socket_t fd);
         void SendUserInfoToClient(std::string username, Socket_t fd);
         void SendUserListToConnectedClient();
+        bool CheckMaxClient();
     public:
         void StopThread(); 
         Handler(); 
