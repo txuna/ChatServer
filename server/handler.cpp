@@ -187,7 +187,7 @@ void Handler::SendUserListToConnectedClient(){
         send_client_queue.push(clpkmap);
         client = client->GetNext();
     }
-    send_client_condition.notify_all();
+    send_client_condition.notify_one();
     delete[] buffer;
     delete user_list_packet;
 }
