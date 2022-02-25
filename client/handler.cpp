@@ -32,6 +32,7 @@ Packet* Handler::ReceiveRawPacket(){
     }
     memcpy(&protocol, buffer, 4);
     switch(protocol){
+        qDebug()<<"[DEBUG]"<<"Protocol Value : "<<protocol;
         case MSG_PROTOCOL:
             packet = (Packet*)new MsgPacket();
             packet->ParseBuffer(buffer);
@@ -42,12 +43,18 @@ Packet* Handler::ReceiveRawPacket(){
             packet->ParseBuffer(buffer);
             return packet;
 
+        case RES_USERLIST_PROTOCOL:
+            qDebug()<<"[DEBUG]"<<"UPDATE USER LIST";
+            packet = (Packet*)new UserListPacket();
+            packet->ParseBuffer(buffer);
+            return packet;
+
         default:
             return NULL; // Protocol Error
     }
 }
 
-//접속후 기본적인 신상정보를 전송한다.
+
 void Handler::ConnectToServer(){
     qDebug()<<"[DEBUG]"<<"Connecting...";
     Socket->connectToHost(this->host, this->port);
@@ -65,11 +72,15 @@ QTcpSocket* Handler::GetSocket(){
 }
 
 // RequestUserList에서 서버쪽으로 패킷을 보내고 Chat::ReceivePacket 메소드에서 Handler의 패킷처리를하고 해당 함수 호출
-UserList* Handler::ProcessingResponseUserList(Packet* packet){
+UserList* Handler::ProcessingResponseUserList(UserListPacket* packet){
     UserList* userlist = new UserList;
-    userlist->AppendUser("tuuna");
-    userlist->AppendUser("kissesy");
-    userlist->AppendUser("sloan");
+    for(int i=0;i<packet->GetNum();i++){
+        if(i > MAX_CLIENT){
+            break;
+        }
+        QString name = packet->GetName(i);
+        userlist->AppendUser(name);
+    }
     return userlist;
 }
 

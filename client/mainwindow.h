@@ -31,6 +31,8 @@
 
 #define PACKET_SIZE 256
 
+#define MAX_CLIENT 25
+
 typedef char Byte_t;
 typedef uint32_t Protocol_t;
 typedef uint32_t Length_t;
@@ -100,6 +102,24 @@ class UserPacket : public Packet{
         std::string GetName();
 };
 
+class UserListPacket : public Packet{
+    private:
+        uint32_t num; // num of user
+        Byte_t name_list[232]; // max 29 * 8 + NULL(*)
+        Byte_t reserve[12];
+
+    public:
+        UserListPacket();
+        virtual ~UserListPacket();
+        virtual void WritePacketBody(Byte_t* buffer);
+        virtual void ParseBuffer(const Byte_t* buffer);
+        virtual void PrintPacket();
+        void SetNum(uint32_t num);
+        void AddUserName(int index, std::string username);
+        uint32_t GetNum();
+        QString GetName(int index);
+};
+
 class User{
 private: 
    QString name;
@@ -136,7 +156,7 @@ public:
     bool SendRawPacketToServer(QString& msg);
     Handler(QString host, quint16 port);
     void ConnectToServer();
-    UserList* ProcessingResponseUserList(Packet* packet);
+    UserList* ProcessingResponseUserList(UserListPacket* packet);
     QString ProcessingResponseMsg(Packet* packet);
     void RequestUserList();
     Packet* ReceiveRawPacket(); // Raw패킷을 Packet클래스로 전환
@@ -171,7 +191,7 @@ public:
     Chat();
     QHBoxLayout* get_base();
     void ConnectToServer();
-    void UpdateUserList(Packet* packet); // UI Update
+    void UpdateUserList(UserListPacket* packet); // UI Update
     void UpdateMsg(MsgPacket* packet);
     void Setup();
     void DeleteUserListWidgetItem();

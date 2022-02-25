@@ -102,6 +102,13 @@ void Chat::onReceivePacket(){
             handler->SetUserName((UserPacket*)packet);
             PrintMsg("Hello " + QString::fromStdString(handler->GetName()));
             break;
+
+        // 유저 목록 갱신
+        case RES_USERLIST_PROTOCOL:
+            qDebug()<<"[DEBUG]"<<"UPDATE USER LIST";
+            DeleteUserListWidgetItem(); //기존 유저 제거
+            UpdateUserList((UserListPacket*)packet);
+            break;
     }
 }
 
@@ -130,7 +137,7 @@ void Chat::PrintMsg(const QString& msg){
 }
 
 // @TODO 기존 유저 지우기 및 QListWidgetItem 객체 메모리 해제 필요
-void Chat::UpdateUserList(Packet* packet){
+void Chat::UpdateUserList(UserListPacket* packet){
     UserList* userlist = handler->ProcessingResponseUserList(packet);
     if(userlist == NULL){
         return;
