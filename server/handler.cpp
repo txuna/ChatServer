@@ -132,7 +132,7 @@ void Handler::RegisterNewClient(){
     std::cout<<string_format("User:%s [IP:%s] Connected", client->GetClientName().c_str(), client->GetIP().c_str())<<std::endl;
     // Client에게 Client  유저의 정보 전송 - 클라이언트는 받은 정보를 기반으로 닉네임 확인 가능
     SendUserInfoToClient(username, client_fd);
-    SendUserListToConnectedClient();
+    //SendUserListToConnectedClient();
     std::cout<<"Have Managed Client Count : "<<client_list->GetClientCount()<<std::endl;
 }
 
